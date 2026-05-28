@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Thung rac</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="header">
+        <div>
+          <h1>Thung rac</h1>
+          <p class="muted">Cac file da xoa tam thoi.</p>
+        </div>
+        <a class="button outline" href="{{ url_for('index') }}">Quay lai</a>
+      </header>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <section class="messages">
+        {% for category, message in messages %}
+        <div class="message {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </section>
+      {% endif %}
+      {% endwith %}
+
+      <section class="card">
+        <h2>Danh sach file</h2>
+        {% if files %}
+        <table>
+          <thead>
+            <tr>
+              <th>Ten file</th>
+              <th>Kich thuoc</th>
+              <th>Ngay upload</th>
+              <th>Thao tac</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for file in files %}
+            <tr>
+              <td>{{ file.original_name }}</td>
+              <td>{{ file.size | bytes }}</td>
+              <td>{{ file.uploaded_at }}</td>
+              <td class="actions">
+                <form method="post" action="{{ url_for('restore', file_id=file.id) }}">
+                  <button class="button small" type="submit">Khoi phuc</button>
+                </form>
+                <form method="post" action="{{ url_for('purge', file_id=file.id) }}">
+                  <button class="button small danger" type="submit">Xoa vinh vien</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="muted">Thung rac trong.</p>
+        {% endif %}
+      </section>
+    </main>
+  </body>
+</html>

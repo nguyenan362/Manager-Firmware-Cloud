@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Quan ly luu tru</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="header">
+        <div>
+          <h1>Quan ly luu tru</h1>
+          <p class="muted">Dung luong da dung: {{ used_bytes | bytes }} / {{ quota_bytes | bytes }}</p>
+          <p class="muted">Con lai: {{ remaining_bytes | bytes }}</p>
+        </div>
+        <a class="button outline" href="{{ url_for('trash') }}">Thung rac</a>
+      </header>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <section class="messages">
+        {% for category, message in messages %}
+        <div class="message {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </section>
+      {% endif %}
+      {% endwith %}
+
+      <section class="card">
+        <h2>Cap nhat dung luong</h2>
+        <form class="row" method="post" action="{{ url_for('set_quota') }}">
+          <input type="number" name="quota_mb" min="1" placeholder="Dung luong (MB)" required />
+          <button class="button" type="submit">Luu</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Upload file</h2>
+        <form class="row" method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
+          <input type="file" name="file" required />
+          <button class="button" type="submit">Upload</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Danh sach file</h2>
+        {% if files %}
+        <table>
+          <thead>
+            <tr>
+              <th>Ten file</th>
+              <th>Kich thuoc</th>
+              <th>Ngay upload</th>
+              <th>Thao tac</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for file in files %}
+            <tr>
+              <td>{{ file.original_name }}</td>
+              <td>{{ file.size | bytes }}</td>
+              <td>{{ file.uploaded_at }}</td>
+              <td class="actions">
+                <a class="button small" href="{{ url_for('download', file_id=file.id) }}">Tai ve</a>
+                <form method="post" action="{{ url_for('move_to_trash', file_id=file.id) }}">
+                  <button class="button small danger" type="submit">Xoa</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="muted">Chua co file nao.</p>
+        {% endif %}
+      </section>
+    </main>
+  </body>
+</html>
