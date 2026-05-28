@@ -34,6 +34,7 @@
             <tr>
               <th>Ten file</th>
               <th>Kich thuoc</th>
+              <th>Loai</th>
               <th>Ngay upload</th>
               <th>Thao tac</th>
             </tr>
@@ -43,6 +44,7 @@
             <tr>
               <td>{{ file.original_name }}</td>
               <td>{{ file.size | bytes }}</td>
+              <td>{{ "Ma hoa" if file.is_encrypted else "Thuong" }}</td>
               <td>{{ file.uploaded_at }}</td>
               <td class="actions">
                 <form method="post" action="{{ url_for('restore', file_id=file.id) }}">

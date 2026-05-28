@@ -2,8 +2,11 @@ import os
 import sqlite3
 import uuid
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
+from typing import Optional
 
+from cryptography.fernet import Fernet, InvalidToken
 from flask import Flask, abort, flash, redirect, render_template, request, send_file, url_for
 from werkzeug.utils import secure_filename
 
@@ -18,6 +21,16 @@ DEFAULT_QUOTA_MB = 1024
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret")
+
+
+def get_fernet() -> Optional[Fernet]:
+    key = os.environ.get("ENCRYPTION_KEY", "").strip()
+    if not key:
+        return None
+    try:
+        return Fernet(key.encode("utf-8"))
+    except (ValueError, TypeError):
+        return None
 
 
 def ensure_dirs() -> None:
@@ -61,6 +74,17 @@ def init_db() -> None:
                 "INSERT INTO settings (key, value) VALUES (?, ?)",
                 ("quota_bytes", str(quota_bytes)),
             )
+        ensure_files_table_columns(conn)
+
+
+def ensure_files_table_columns(conn: sqlite3.Connection) -> None:
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(files)").fetchall()
+    }
+    if "is_encrypted" not in columns:
+        conn.execute(
+            "ALTER TABLE files ADD COLUMN is_encrypted INTEGER NOT NULL DEFAULT 0"
+        )
 
 
 def get_quota_bytes(conn: sqlite3.Connection) -> int:
@@ -103,11 +127,12 @@ app.jinja_env.filters["bytes"] = format_bytes
 def index():
     with get_db() as conn:
         files = conn.execute(
-            "SELECT id, original_name, size, uploaded_at FROM files "
+            "SELECT id, original_name, size, uploaded_at, is_encrypted FROM files "
             "WHERE status = 'active' ORDER BY uploaded_at DESC"
         ).fetchall()
         used_bytes = get_used_bytes(conn)
         quota_bytes = get_quota_bytes(conn)
+    encryption_available = get_fernet() is not None
     remaining_bytes = max(quota_bytes - used_bytes, 0)
     return render_template(
         "index.html",
@@ -115,6 +140,7 @@ def index():
         used_bytes=used_bytes,
         quota_bytes=quota_bytes,
         remaining_bytes=remaining_bytes,
+        encryption_available=encryption_available,
     )
 
 
@@ -143,9 +169,22 @@ def upload():
         flash("Ten file khong hop le.", "error")
         return redirect(url_for("index"))
 
+    encrypt_requested = request.form.get("encrypt") == "on"
+    fernet = None
+    if encrypt_requested:
+        fernet = get_fernet()
+        if fernet is None:
+            flash("Chua co khoa ma hoa hop le.", "error")
+            return redirect(url_for("index"))
+
     stored_name = uuid.uuid4().hex
     target_path = UPLOAD_DIR / stored_name
-    upload_file.save(target_path)
+    if fernet is None:
+        upload_file.save(target_path)
+    else:
+        plaintext = upload_file.read()
+        token = fernet.encrypt(plaintext)
+        target_path.write_bytes(token)
     size = target_path.stat().st_size
 
     with get_db() as conn:
@@ -158,13 +197,14 @@ def upload():
 
         conn.execute(
             "INSERT INTO files (id, original_name, stored_name, size, uploaded_at, status) "
-            "VALUES (?, ?, ?, ?, ?, 'active')",
+            "VALUES (?, ?, ?, ?, ?, 'active', ?)",
             (
                 uuid.uuid4().hex,
                 original_name,
                 stored_name,
                 size,
                 datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                1 if fernet is not None else 0,
             ),
         )
 
@@ -176,7 +216,7 @@ def upload():
 def download(file_id: str):
     with get_db() as conn:
         row = conn.execute(
-            "SELECT stored_name, original_name, status FROM files WHERE id = ?",
+            "SELECT stored_name, original_name, status, is_encrypted FROM files WHERE id = ?",
             (file_id,),
         ).fetchone()
     if row is None or row["status"] != "active":
@@ -184,6 +224,20 @@ def download(file_id: str):
     file_path = UPLOAD_DIR / row["stored_name"]
     if not file_path.exists():
         abort(404)
+    if row["is_encrypted"] == 1:
+        fernet = get_fernet()
+        if fernet is None:
+            abort(500)
+        try:
+            plaintext = fernet.decrypt(file_path.read_bytes())
+        except InvalidToken:
+            abort(500)
+        return send_file(
+            BytesIO(plaintext),
+            as_attachment=True,
+            download_name=row["original_name"],
+            mimetype="application/octet-stream",
+        )
     return send_file(file_path, as_attachment=True, download_name=row["original_name"])
 
 
@@ -208,7 +262,7 @@ def move_to_trash(file_id: str):
 def trash():
     with get_db() as conn:
         files = conn.execute(
-            "SELECT id, original_name, size, uploaded_at FROM files "
+            "SELECT id, original_name, size, uploaded_at, is_encrypted FROM files "
             "WHERE status = 'trash' ORDER BY uploaded_at DESC"
         ).fetchall()
     return render_template("trash.html", files=files)

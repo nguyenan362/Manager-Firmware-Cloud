@@ -20,6 +20,8 @@ python app.py
 
 Mo trinh duyet tai http://localhost:5000
 
+Neu muon ma hoa file, dat bien moi truong `ENCRYPTION_KEY` theo dinh dang Fernet.
+
 ## Chay voi Docker
 
 ```

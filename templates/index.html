@@ -39,8 +39,15 @@
         <h2>Upload file</h2>
         <form class="row" method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
           <input type="file" name="file" required />
+          <label class="checkbox">
+            <input type="checkbox" name="encrypt" {% if not encryption_available %}disabled{% endif %} />
+            Ma hoa file
+          </label>
           <button class="button" type="submit">Upload</button>
         </form>
+        {% if not encryption_available %}
+        <p class="muted">Chua co khoa ma hoa. Thiet lap ENCRYPTION_KEY de bat ma hoa.</p>
+        {% endif %}
       </section>
 
       <section class="card">
@@ -51,6 +58,7 @@
             <tr>
               <th>Ten file</th>
               <th>Kich thuoc</th>
+              <th>Loai</th>
               <th>Ngay upload</th>
               <th>Thao tac</th>
             </tr>
@@ -60,6 +68,7 @@
             <tr>
               <td>{{ file.original_name }}</td>
               <td>{{ file.size | bytes }}</td>
+              <td>{{ "Ma hoa" if file.is_encrypted else "Thuong" }}</td>
               <td>{{ file.uploaded_at }}</td>
               <td class="actions">
                 <a class="button small" href="{{ url_for('download', file_id=file.id) }}">Tai ve</a>
