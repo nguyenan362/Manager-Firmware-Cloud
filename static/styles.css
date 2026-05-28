@@ -67,7 +67,8 @@ h2 {
 }
 
 input[type="file"],
-input[type="number"] {
+input[type="number"],
+input[type="text"] {
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--border);

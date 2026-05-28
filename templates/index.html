@@ -51,6 +51,15 @@
       </section>
 
       <section class="card">
+        <h2>Import file tren server</h2>
+        <form class="row" method="post" action="{{ url_for('import_file') }}">
+          <input type="text" name="server_path" placeholder="Duong dan tuyet doi tren server" required />
+          <button class="button" type="submit">Import</button>
+        </form>
+        <p class="muted">File se duoc sao chep vao thu muc uploads va them vao danh sach.</p>
+      </section>
+
+      <section class="card">
         <h2>Danh sach file</h2>
         {% if files %}
         <table>

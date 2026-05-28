@@ -1,6 +1,7 @@
 # Firmware-Cloud
 
 Web app nho de quan ly luu tru: upload, download, xoa, thung rac, va cap nhat dung luong.
+Ho tro import file da co tren server thong qua giao dien.
 
 ## Chay local
 

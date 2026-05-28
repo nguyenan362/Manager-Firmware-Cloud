@@ -1,4 +1,5 @@
 import os
+import shutil
 import sqlite3
 import uuid
 from datetime import datetime
@@ -209,6 +210,55 @@ def upload():
         )
 
     flash("Upload thanh cong.", "success")
+    return redirect(url_for("index"))
+
+
+@app.route("/import", methods=["POST"])
+def import_file():
+    raw_path = request.form.get("server_path", "").strip()
+    if not raw_path:
+        flash("Vui long nhap duong dan tren server.", "error")
+        return redirect(url_for("index"))
+
+    source_path = Path(raw_path)
+    if not source_path.exists() or not source_path.is_file():
+        flash("Duong dan khong ton tai hoac khong phai file.", "error")
+        return redirect(url_for("index"))
+
+    original_name = secure_filename(source_path.name)
+    if not original_name:
+        flash("Ten file khong hop le.", "error")
+        return redirect(url_for("index"))
+
+    size = source_path.stat().st_size
+    with get_db() as conn:
+        used_bytes = get_used_bytes(conn)
+        quota_bytes = get_quota_bytes(conn)
+        if used_bytes + size > quota_bytes:
+            flash("Vuot qua dung luong cho phep.", "error")
+            return redirect(url_for("index"))
+
+        stored_name = uuid.uuid4().hex
+        target_path = UPLOAD_DIR / stored_name
+        try:
+            shutil.copy2(source_path, target_path)
+        except OSError:
+            flash("Khong the sao chep file.", "error")
+            return redirect(url_for("index"))
+
+        conn.execute(
+            "INSERT INTO files (id, original_name, stored_name, size, uploaded_at, status, is_encrypted) "
+            "VALUES (?, ?, ?, ?, ?, 'active', 0)",
+            (
+                uuid.uuid4().hex,
+                original_name,
+                stored_name,
+                size,
+                datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            ),
+        )
+
+    flash("Import thanh cong.", "success")
     return redirect(url_for("index"))
 
 
